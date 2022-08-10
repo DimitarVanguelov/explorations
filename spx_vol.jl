@@ -15,7 +15,7 @@ macro bind(def, element)
 end
 
 # ╔═╡ a11f4c64-b326-4d51-a2fb-aeb8127058f6
-using Dates, PlutoUI
+using Dates, PlutoUI, Formatting
 
 # ╔═╡ e03de3bc-176a-11ed-036d-17684fbb333f
 using CSV, Chain, DataFrames, DataFramesMeta, Distributions, StatsPlots, RollingFunctions
@@ -29,8 +29,11 @@ data_path = joinpath(".", "data", "spx_historical_2022-08-05.csv")
 # ╔═╡ 822427b7-5162-4d01-8467-5ce5fb06d6bf
 data = CSV.File(data_path, dateformat="mm/dd/yyyy") |> DataFrame;
 
+# ╔═╡ b3781e4e-0ebb-499d-acac-b484e4569f0d
+N = 50
+
 # ╔═╡ 7bc30a58-1c26-434d-b51d-39f04f787e72
-lookback = Day(50)
+lookback = Day(N)
 
 # ╔═╡ 9dcdd291-e06c-477d-88af-88a2283c34e9
 df = @chain data begin
@@ -50,26 +53,54 @@ df = @chain data begin
 end
 
 # ╔═╡ c00ef0fd-2f54-40d7-a775-e61f21db6c89
-@bind x Slider(reverse(1:size(df)[1]-lookback.value); show_value=true)
+@bind x Slider(reverse(1:size(df)[1]-N); show_value=true)
 
 # ╔═╡ 5f38e47f-af36-4a95-89a8-125d96ef5e1d
-mini_df = df[1+x:lookback.value+x, :];
+mini_df = df[1+x:N+x, :];
+
+# ╔═╡ 6fa133d4-3cfd-4024-860c-243c75118099
+function exp_weight(n; α=:auto)
+	α == :auto ? α = 1 - 2/(n + 1) : α
+	w = [((1-α) / (1-α^n)) * α^(i-1) for i in 1:n]
+	@assert isapprox(sum(w), 1.0) "weights not adding up to 1"
+	return w
+end
+
+# ╔═╡ 976ea6da-2f6f-45f0-b60e-2ab1116dfef0
+alpha_weights = vcat(1, exp_weight(N)[1:end-1] .* 3);
 
 # ╔═╡ 3cf25777-9183-4ded-b3da-b85aa5a726d9
-plot(
+let
+p1 = plot(
 	Normal.(mini_df.return, mini_df.return_std),
 	legend=false,
 	color=cgrad(:ice),
-	alpha=permutedims([1 - i/lookback.value for i in 1:lookback.value]),
+	alpha=permutedims(alpha_weights),
 	xlim=(-0.075, 0.075),
 	ylim=(-1, 100),
 	yticks=false,
 	grid=false,
-	title=df.date[x],
+	title="SPX Volatility: $(df.date[x])",
+	ylabel="Vol density",
+	xlabel="Daily return",
+)
+vline!(p1, [mini_df.return[1]])
+
+ndf = reverse(df)
+p2 = plot(
+	ndf.date[1:end-x],
+	ndf.price_curr[1:end-x],
+	legend=false,
+	# xlim=extrema(ndf.date),
+	# ylim=(0, 5500),
+	ylabel="SPX Index",
+	left_margin=20Plots.px,
+	formatter=y -> format(y, autoscale=:metric),
+	# size(500, 200)
 )
 
-# ╔═╡ b145c83d-013c-48b1-821a-159205202e66
-
+plot(p1, p2, layout=(2, 1))
+end
 
 # ╔═╡ 06c438ae-d835-4e4d-bbd9-cd4de647bfa4
 html"""
@@ -92,6 +123,7 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 RollingFunctions = "b0e4dd01-7b14-53d8-9b45-175a3e362653"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
@@ -103,6 +135,7 @@ Chain = "~0.5.0"
 DataFrames = "~1.3.4"
 DataFramesMeta = "~0.12.0"
 Distributions = "~0.25.66"
+Formatting = "~0.4.2"
 PlutoUI = "~0.7.39"
 RollingFunctions = "~0.6.2"
 StatsPlots = "~0.15.1"
@@ -1393,12 +1426,14 @@ version = "1.4.1+0"
 # ╠═55db91b2-5153-4267-a34a-00f20f3c5e4a
 # ╠═e5bcf4bb-61eb-4e82-a391-e06fbff5ceba
 # ╠═822427b7-5162-4d01-8467-5ce5fb06d6bf
+# ╠═b3781e4e-0ebb-499d-acac-b484e4569f0d
 # ╠═7bc30a58-1c26-434d-b51d-39f04f787e72
 # ╠═9dcdd291-e06c-477d-88af-88a2283c34e9
 # ╠═c00ef0fd-2f54-40d7-a775-e61f21db6c89
 # ╠═5f38e47f-af36-4a95-89a8-125d96ef5e1d
+# ╠═976ea6da-2f6f-45f0-b60e-2ab1116dfef0
 # ╠═3cf25777-9183-4ded-b3da-b85aa5a726d9
-# ╠═b145c83d-013c-48b1-821a-159205202e66
+# ╠═6fa133d4-3cfd-4024-860c-243c75118099
 # ╟─06c438ae-d835-4e4d-bbd9-cd4de647bfa4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
