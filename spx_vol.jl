@@ -24,7 +24,7 @@ using CSV, Chain, DataFrames, DataFramesMeta, Distributions, StatsPlots, Rolling
 using TimeSeries: TimeArray, lag
 
 # ╔═╡ e5bcf4bb-61eb-4e82-a391-e06fbff5ceba
-data_path = "/home/dimitar/Downloads/HistoricalData_1659998822194.csv";
+data_path = joinpath(".", "data", "spx_historical_2022-08-05.csv")
 
 # ╔═╡ 822427b7-5162-4d01-8467-5ce5fb06d6bf
 data = CSV.File(data_path, dateformat="mm/dd/yyyy") |> DataFrame;
