@@ -14,29 +14,25 @@ macro bind(def, element)
     end
 end
 
-# ╔═╡ a11f4c64-b326-4d51-a2fb-aeb8127058f6
-using Dates, PlutoUI, Formatting, PlotThemes
+# ╔═╡ 01bb4dd8-df58-40cc-8c13-cbdc867c7f59
+begin
+	using Dates
 
-# ╔═╡ e03de3bc-176a-11ed-036d-17684fbb333f
-using CSV, Chain, DataFrames, DataFramesMeta, Distributions, StatsPlots, RollingFunctions
+	using PlutoUI
+	using Formatting
+	using StatsPlots
+	using PlotThemes
 
-# ╔═╡ 55db91b2-5153-4267-a34a-00f20f3c5e4a
-using TimeSeries: TimeArray, lag
+	using CSV
+	using DataFramesMeta  # reexports Chain and DataFrames
 
-# ╔═╡ e5bcf4bb-61eb-4e82-a391-e06fbff5ceba
-data_path = joinpath(".", "data", "spx_historical_2022-08-05.csv")
-
-# ╔═╡ 822427b7-5162-4d01-8467-5ce5fb06d6bf
-data = CSV.File(data_path, dateformat="mm/dd/yyyy") |> DataFrame;
-
-# ╔═╡ b3781e4e-0ebb-499d-acac-b484e4569f0d
-N = 50;
-
-# ╔═╡ 7bc30a58-1c26-434d-b51d-39f04f787e72
-lookback = Day(N)
+	using Distributions
+	using RollingFunctions
+	using TimeSeries: TimeArray, lag
+end
 
 # ╔═╡ 9dcdd291-e06c-477d-88af-88a2283c34e9
-function wrangle(data)
+function wrangle(data, N)
 	df = @chain data begin
 		select(["Date", "Close/Last"] .=> ["date", "price"])
 		rev = reverse
@@ -47,13 +43,13 @@ function wrangle(data)
 		@transform(:price_diff = :price_curr .- :price_prev)
 		@transform(:return = log.(:price_curr ./ :price_prev))
 		tmp = reverse
-		return_std = rollstd(_.return, lookback.value)
+		return_std = rollstd(_.return, N)
 		first(tmp, length(_))
 		@transform(:return_std = return_std)
 		@transform(:return_std_ann = return_std .* sqrt(252))
 	end
 	return df
-end
+end;
 
 # ╔═╡ 6fa133d4-3cfd-4024-860c-243c75118099
 function exp_weight(n; α=:auto)
@@ -61,17 +57,20 @@ function exp_weight(n; α=:auto)
 	w = [((1-α) / (1-α^n)) * α^(i-1) for i in 1:n]
 	@assert isapprox(sum(w), 1.0) "weights not adding up to 1"
 	return w
-end
+end;
 
 # ╔═╡ 3cf25777-9183-4ded-b3da-b85aa5a726d9
 function plot_vol(df, N, x)
 	theme(:mute)
-	
-	mini_df = df[1+x:N+x, :];
+	# create small N size dataframe based on index x
+	mini_df = df[1+x:N+x, :]
+	# turn returns and their stardard deviations into normal distributions
 	n = Normal.(mini_df.return, mini_df.return_std)
-	alpha_weights = vcat(1, exp_weight(N, α=.9)[1:end-1] .* 2);
-	
+	# create weights for alpha values used in plotting
+	alpha_weights = vcat(1, exp_weight(N, α=.9)[1:end-1] .* 2)
+
 	main_color = colorant"#c67"
+
 	p1 = plot(
 		n,
 		legend=false,
@@ -85,7 +84,8 @@ function plot_vol(df, N, x)
 		ylabel="Vol density",
 		xlabel="Daily return",
 	)
-	
+
+	# create verical line at current dist mean, stopping at top of curve
 	r = n[1]
 	plot!(
 		p1,
@@ -93,7 +93,8 @@ function plot_vol(df, N, x)
 		[0, pdf(r, r.μ)], 
 		color=main_color,
 	)
-	
+
+	# reverse the df in order to plot values chronologically
 	ndf = reverse(df)
 	p2 = plot(
 		ndf.date[1:end-x],
@@ -106,12 +107,25 @@ function plot_vol(df, N, x)
 		left_margin=10Plots.px,
 		formatter=y -> format(y, autoscale=:metric),
 	)
-	
+
+	# layout the two plots together
 	return plot(p1, p2, layout=grid(2, 1, heights=[.8, .2]), size=(700, 700))
-end
+end;
+
+# ╔═╡ e5bcf4bb-61eb-4e82-a391-e06fbff5ceba
+data_path = joinpath(".", "data", "spx_historical_2022-08-05.csv")
+
+# ╔═╡ 822427b7-5162-4d01-8467-5ce5fb06d6bf
+# original data
+data = CSV.File(data_path, dateformat="mm/dd/yyyy") |> DataFrame;
+
+# ╔═╡ b3781e4e-0ebb-499d-acac-b484e4569f0d
+# lookback window
+N = 50;
 
 # ╔═╡ 8605730a-8992-43a4-b7f4-1c31e8e21c9b
-df = wrangle(data)
+# transformed data
+df = wrangle(data, N)
 
 # ╔═╡ c00ef0fd-2f54-40d7-a775-e61f21db6c89
 @bind x Slider(reverse(1:size(df)[1]-N); show_value=true)
@@ -149,8 +163,6 @@ html"""
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-Chain = "8be319e6-bccf-4806-a6f7-6fae938471bc"
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -163,8 +175,6 @@ TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 
 [compat]
 CSV = "~0.10.4"
-Chain = "~0.5.0"
-DataFrames = "~1.3.4"
 DataFramesMeta = "~0.12.0"
 Distributions = "~0.25.66"
 Formatting = "~0.4.2"
@@ -1454,18 +1464,15 @@ version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a11f4c64-b326-4d51-a2fb-aeb8127058f6
-# ╠═e03de3bc-176a-11ed-036d-17684fbb333f
-# ╠═55db91b2-5153-4267-a34a-00f20f3c5e4a
-# ╠═e5bcf4bb-61eb-4e82-a391-e06fbff5ceba
-# ╠═822427b7-5162-4d01-8467-5ce5fb06d6bf
-# ╠═b3781e4e-0ebb-499d-acac-b484e4569f0d
-# ╠═7bc30a58-1c26-434d-b51d-39f04f787e72
+# ╠═01bb4dd8-df58-40cc-8c13-cbdc867c7f59
 # ╠═9dcdd291-e06c-477d-88af-88a2283c34e9
 # ╠═6fa133d4-3cfd-4024-860c-243c75118099
 # ╠═3cf25777-9183-4ded-b3da-b85aa5a726d9
+# ╠═e5bcf4bb-61eb-4e82-a391-e06fbff5ceba
+# ╠═822427b7-5162-4d01-8467-5ce5fb06d6bf
+# ╠═b3781e4e-0ebb-499d-acac-b484e4569f0d
 # ╠═8605730a-8992-43a4-b7f4-1c31e8e21c9b
-# ╠═c00ef0fd-2f54-40d7-a775-e61f21db6c89
+# ╟─c00ef0fd-2f54-40d7-a775-e61f21db6c89
 # ╠═76b684d5-eeb8-48f3-880c-c198d1f39742
 # ╠═56f8a47d-41a7-491f-901f-690aee610cbd
 # ╠═78760aae-b45b-459e-a93a-5fa74f17dffd
