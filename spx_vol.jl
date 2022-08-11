@@ -15,7 +15,7 @@ macro bind(def, element)
 end
 
 # ╔═╡ a11f4c64-b326-4d51-a2fb-aeb8127058f6
-using Dates, PlutoUI, Formatting
+using Dates, PlutoUI, Formatting, PlotThemes
 
 # ╔═╡ e03de3bc-176a-11ed-036d-17684fbb333f
 using CSV, Chain, DataFrames, DataFramesMeta, Distributions, StatsPlots, RollingFunctions
@@ -30,33 +30,30 @@ data_path = joinpath(".", "data", "spx_historical_2022-08-05.csv")
 data = CSV.File(data_path, dateformat="mm/dd/yyyy") |> DataFrame;
 
 # ╔═╡ b3781e4e-0ebb-499d-acac-b484e4569f0d
-N = 50
+N = 50;
 
 # ╔═╡ 7bc30a58-1c26-434d-b51d-39f04f787e72
 lookback = Day(N)
 
 # ╔═╡ 9dcdd291-e06c-477d-88af-88a2283c34e9
-df = @chain data begin
-	select(["Date", "Close/Last"] .=> ["date", "price"])
-	rev = reverse
-	TimeArray(timestamp = :date)
-	lag
-	DataFrame
-	innerjoin(rev, _, on = :date => :timestamp, renamecols = "_curr" => "_prev")
-	@transform(:price_diff = :price_curr .- :price_prev)
-	@transform(:return = :price_curr ./ :price_prev .- 1)
-	tmp = reverse
-	return_std = rollstd(_.return, lookback.value)
-	first(tmp, length(_))
-	@transform(:return_std = return_std)
-	@transform(:return_std_ann = return_std .* sqrt(252))
+function wrangle(data)
+	df = @chain data begin
+		select(["Date", "Close/Last"] .=> ["date", "price"])
+		rev = reverse
+		TimeArray(timestamp = :date)
+		lag
+		DataFrame
+		innerjoin(rev, _, on = :date => :timestamp, renamecols = "_curr" => "_prev")
+		@transform(:price_diff = :price_curr .- :price_prev)
+		@transform(:return = log.(:price_curr ./ :price_prev))
+		tmp = reverse
+		return_std = rollstd(_.return, lookback.value)
+		first(tmp, length(_))
+		@transform(:return_std = return_std)
+		@transform(:return_std_ann = return_std .* sqrt(252))
+	end
+	return df
 end
-
-# ╔═╡ c00ef0fd-2f54-40d7-a775-e61f21db6c89
-@bind x Slider(reverse(1:size(df)[1]-N); show_value=true)
-
-# ╔═╡ 5f38e47f-af36-4a95-89a8-125d96ef5e1d
-mini_df = df[1+x:N+x, :];
 
 # ╔═╡ 6fa133d4-3cfd-4024-860c-243c75118099
 function exp_weight(n; α=:auto)
@@ -66,43 +63,61 @@ function exp_weight(n; α=:auto)
 	return w
 end
 
-# ╔═╡ 976ea6da-2f6f-45f0-b60e-2ab1116dfef0
-alpha_weights = vcat(1, exp_weight(N)[1:end-1] .* 3);
-
 # ╔═╡ 3cf25777-9183-4ded-b3da-b85aa5a726d9
-begin
-n = Normal.(mini_df.return, mini_df.return_std)
-p1 = plot(
-	n,
-	legend=false,
-	color=cgrad(:ice),
-	alpha=permutedims(alpha_weights),
-	xlim=(-0.075, 0.075),
-	ylim=(-1, 120),
-	yticks=false,
-	grid=false,
-	title="SPX Volatility:\n$(df.date[x])",
-	ylabel="Vol density",
-	xlabel="Daily return",
-	size=(500, 500),
-)
-r = n[1]
-plot!(p1, [r.μ, r.μ], [0, pdf(r, r.μ)], color=:red)
-
-ndf = reverse(df)
-p2 = plot(
-	ndf.date[1:end-x],
-	ndf.price_curr[1:end-x],
-	color=:red,
-	legend=false,
-	ylabel="SPX Index",
-	left_margin=10Plots.px,
-	formatter=y -> format(y, autoscale=:metric),
-	size=(500, 200),
-)
-
-plot(p1, p2, layout=(2, 1))
+function plot_vol(df, N, x)
+	theme(:mute)
+	
+	mini_df = df[1+x:N+x, :];
+	n = Normal.(mini_df.return, mini_df.return_std)
+	alpha_weights = vcat(1, exp_weight(N, α=.9)[1:end-1] .* 2);
+	
+	main_color = colorant"#c67"
+	p1 = plot(
+		n,
+		legend=false,
+		color=main_color,
+		alpha=permutedims(alpha_weights),
+		xlim=(-0.075, 0.075),
+		ylim=(-1, 120),
+		grid=false,
+		title="SPX Volatility:\n$(df.date[x])",
+		titlefontsize=13,
+		ylabel="Vol density",
+		xlabel="Daily return",
+	)
+	
+	r = n[1]
+	plot!(
+		p1,
+		[r.μ, r.μ],
+		[0, pdf(r, r.μ)], 
+		color=main_color,
+	)
+	
+	ndf = reverse(df)
+	p2 = plot(
+		ndf.date[1:end-x],
+		ndf.price_curr[1:end-x],
+		color=main_color,
+		legend=false,
+		xlabel="Date",
+		ylabel="SPX Index",
+		yminorticks=false,
+		left_margin=10Plots.px,
+		formatter=y -> format(y, autoscale=:metric),
+	)
+	
+	return plot(p1, p2, layout=grid(2, 1, heights=[.8, .2]), size=(700, 700))
 end
+
+# ╔═╡ 8605730a-8992-43a4-b7f4-1c31e8e21c9b
+df = wrangle(data)
+
+# ╔═╡ c00ef0fd-2f54-40d7-a775-e61f21db6c89
+@bind x Slider(reverse(1:size(df)[1]-N); show_value=true)
+
+# ╔═╡ 76b684d5-eeb8-48f3-880c-c198d1f39742
+p = plot_vol(df, N, x)
 
 # ╔═╡ 06c438ae-d835-4e4d-bbd9-cd4de647bfa4
 html"""
@@ -126,6 +141,7 @@ DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
+PlotThemes = "ccf2f8ad-2431-5c83-bf29-c5338b663b6a"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 RollingFunctions = "b0e4dd01-7b14-53d8-9b45-175a3e362653"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
@@ -138,6 +154,7 @@ DataFrames = "~1.3.4"
 DataFramesMeta = "~0.12.0"
 Distributions = "~0.25.66"
 Formatting = "~0.4.2"
+PlotThemes = "~3.0.0"
 PlutoUI = "~0.7.39"
 RollingFunctions = "~0.6.2"
 StatsPlots = "~0.15.1"
@@ -1431,11 +1448,11 @@ version = "1.4.1+0"
 # ╠═b3781e4e-0ebb-499d-acac-b484e4569f0d
 # ╠═7bc30a58-1c26-434d-b51d-39f04f787e72
 # ╠═9dcdd291-e06c-477d-88af-88a2283c34e9
-# ╠═c00ef0fd-2f54-40d7-a775-e61f21db6c89
-# ╠═5f38e47f-af36-4a95-89a8-125d96ef5e1d
-# ╠═976ea6da-2f6f-45f0-b60e-2ab1116dfef0
-# ╠═3cf25777-9183-4ded-b3da-b85aa5a726d9
 # ╠═6fa133d4-3cfd-4024-860c-243c75118099
+# ╠═3cf25777-9183-4ded-b3da-b85aa5a726d9
+# ╠═8605730a-8992-43a4-b7f4-1c31e8e21c9b
+# ╠═c00ef0fd-2f54-40d7-a775-e61f21db6c89
+# ╠═76b684d5-eeb8-48f3-880c-c198d1f39742
 # ╟─06c438ae-d835-4e4d-bbd9-cd4de647bfa4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
