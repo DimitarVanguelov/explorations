@@ -70,33 +70,35 @@ end
 alpha_weights = vcat(1, exp_weight(N)[1:end-1] .* 3);
 
 # ╔═╡ 3cf25777-9183-4ded-b3da-b85aa5a726d9
-let
+begin
+n = Normal.(mini_df.return, mini_df.return_std)
 p1 = plot(
-	Normal.(mini_df.return, mini_df.return_std),
+	n,
 	legend=false,
 	color=cgrad(:ice),
 	alpha=permutedims(alpha_weights),
 	xlim=(-0.075, 0.075),
-	ylim=(-1, 100),
+	ylim=(-1, 120),
 	yticks=false,
 	grid=false,
-	title="SPX Volatility: $(df.date[x])",
+	title="SPX Volatility:\n$(df.date[x])",
 	ylabel="Vol density",
 	xlabel="Daily return",
+	size=(500, 500),
 )
-vline!(p1, [mini_df.return[1]])
+r = n[1]
+plot!(p1, [r.μ, r.μ], [0, pdf(r, r.μ)], color=:red)
 
 ndf = reverse(df)
 p2 = plot(
 	ndf.date[1:end-x],
 	ndf.price_curr[1:end-x],
+	color=:red,
 	legend=false,
-	# xlim=extrema(ndf.date),
-	# ylim=(0, 5500),
 	ylabel="SPX Index",
-	left_margin=20Plots.px,
+	left_margin=10Plots.px,
 	formatter=y -> format(y, autoscale=:metric),
-	# size(500, 200)
+	size=(500, 200),
 )
 
 plot(p1, p2, layout=(2, 1))
