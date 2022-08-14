@@ -36,6 +36,7 @@ end
 
 # ╔═╡ 0c3691a3-0e2a-4049-bbba-aa842d4852a3
 begin
+	default(titlefont=("Avantgarde Demi"))
 	areaplot(
 		df.year,
 		[df.Bulgaria, df.Poland],
@@ -43,8 +44,10 @@ begin
 		fillcolor=[:green :red],
 		legend=:topleft,
 		label=["Bulgaria" "Poland"],
-		ylim=(-0.5, 22),
 		title="Crude Mortality Rates\nPoland and Bulgaria",
+		ylabel="per 1,000 people",
+		ylim=(-0.5, 22),
+		left_margin=15Plots.px,
 	)
 end
 
