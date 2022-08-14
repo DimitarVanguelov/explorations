@@ -39,17 +39,17 @@ begin
 	areaplot(
 		df.year,
 		[df.Bulgaria, df.Poland],
-		color=[:green2 :red2],
+		color=[:green :red],
 		fillcolor=[:green :red],
 		legend=:topleft,
 		label=["Bulgaria" "Poland"],
-		ylim=(-0.5, 25),
+		ylim=(-0.5, 22),
 		title="Crude Mortality Rates\nPoland and Bulgaria",
 	)
 end
 
-# ╔═╡ e709f23a-3ff2-4e3c-a797-dda6807aa5d6
-areaplot(1:3, [1 2 3; 7 8 9; 4 5 6], seriescolor = [:red :green :blue], fillalpha = [0.2 0.3 0.4])
+# ╔═╡ 16ed3f65-9f29-4360-a9fc-993fc1e79303
+
 
 # ╔═╡ 5861201b-c5c1-46da-84f6-ca4d8b69dc20
 html"""
@@ -1344,7 +1344,7 @@ version = "1.4.1+0"
 # ╠═c781fd6a-b7ab-4d54-869c-ed5118cc0509
 # ╠═ddeec9fd-28c0-4127-885b-5cb9ac2c3c89
 # ╠═0c3691a3-0e2a-4049-bbba-aa842d4852a3
-# ╠═e709f23a-3ff2-4e3c-a797-dda6807aa5d6
+# ╠═16ed3f65-9f29-4360-a9fc-993fc1e79303
 # ╟─5861201b-c5c1-46da-84f6-ca4d8b69dc20
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
