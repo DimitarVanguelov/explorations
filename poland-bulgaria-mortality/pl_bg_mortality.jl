@@ -21,7 +21,7 @@ downloaded_file = Downloads.download(url);
 clean_year(x::String) = parse(Int, replace(x, "_" => ""));
 
 # ╔═╡ ddeec9fd-28c0-4127-885b-5cb9ac2c3c89
-data = @chain downloaded_file begin
+df = @chain downloaded_file begin
 	ZipFile.Reader
 	_.files[2]
 	CSV.File(header=4, normalizenames=true)
@@ -30,12 +30,26 @@ data = @chain downloaded_file begin
 	select(Not([:country_code, :indicator_name, :indicator_code, :column67]))
 	stack(Not([:country_name]), variable_name=:year, value_name=:mort_rate)
 	transform!(:year => ByRow(clean_year) => :year)
-	@rsubset :country_name == "Poland" || :country_name == "Bulgaria"
+	@rsubset :country_name in ["Poland", "Bulgaria"]
 	unstack(:year, :country_name, :mort_rate)
 end
 
-# ╔═╡ 081a9b28-8af0-4580-95e0-1e2d9cd2d88a
+# ╔═╡ 0c3691a3-0e2a-4049-bbba-aa842d4852a3
+begin
+	areaplot(
+		df.year,
+		[df.Bulgaria, df.Poland],
+		color=[:green2 :red2],
+		fillcolor=[:green :red],
+		legend=:topleft,
+		label=["Bulgaria" "Poland"],
+		ylim=(-0.5, 25),
+		title="Crude Mortality Rates\nPoland and Bulgaria",
+	)
+end
 
+# ╔═╡ e709f23a-3ff2-4e3c-a797-dda6807aa5d6
+areaplot(1:3, [1 2 3; 7 8 9; 4 5 6], seriescolor = [:red :green :blue], fillalpha = [0.2 0.3 0.4])
 
 # ╔═╡ 5861201b-c5c1-46da-84f6-ca4d8b69dc20
 html"""
@@ -1329,7 +1343,8 @@ version = "1.4.1+0"
 # ╠═7277bf27-a2e9-4e3b-8692-bf571e05ceac
 # ╠═c781fd6a-b7ab-4d54-869c-ed5118cc0509
 # ╠═ddeec9fd-28c0-4127-885b-5cb9ac2c3c89
-# ╠═081a9b28-8af0-4580-95e0-1e2d9cd2d88a
+# ╠═0c3691a3-0e2a-4049-bbba-aa842d4852a3
+# ╠═e709f23a-3ff2-4e3c-a797-dda6807aa5d6
 # ╟─5861201b-c5c1-46da-84f6-ca4d8b69dc20
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
